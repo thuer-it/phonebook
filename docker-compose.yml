@@ -1,0 +1,17 @@
+services:
+  phonebook:
+    build: .
+    container_name: phonebook
+    restart: always
+    ports:
+      - "8090:8090"
+    volumes:
+      - phonebook_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8090/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+
+volumes:
+  phonebook_data:

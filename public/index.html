@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telefonbuch</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --accent: #4f8ef7;
+    --accent-dim: #2a4a8a;
+    --text: #e2e4ed;
+    --muted: #6b7080;
+    --danger: #e05555;
+    --success: #3ec98a;
+    --radius: 8px;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  header h1 span { color: var(--accent); }
+
+  .toolbar {
+    padding: 16px 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search {
+    flex: 1; min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+  }
+  .search:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-danger  { background: var(--danger); color: #fff; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .export-group { display: flex; gap: 6px; }
+
+  .table-wrap { padding: 0 24px 24px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    text-align: left; padding: 10px 12px;
+    color: var(--muted); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .actions { display: flex; gap: 6px; }
+  .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
+
+  /* Modal */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    width: 100%; max-width: 460px;
+    margin: 16px;
+  }
+  .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1/-1; }
+  label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--success); color: #fff;
+    padding: 10px 18px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transition: opacity 0.2s;
+    pointer-events: none; z-index: 200;
+  }
+  .toast.show { opacity: 1; }
+
+  .xml-url {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: monospace;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .xml-url:hover { border-color: var(--accent); color: var(--accent); }
+
+  footer {
+    text-align: center;
+    padding: 20px 24px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Telefon<span>buch</span></h1>
+  <div style="font-size:12px;color:var(--muted)" id="count"></div>
+</header>
+
+<div class="toolbar">
+  <input class="search" type="search" placeholder="Suchen…" id="search" oninput="render()">
+  <button class="btn btn-primary" onclick="openModal()">+ Kontakt</button>
+  <div class="export-group">
+    <button class="btn btn-outline" onclick="location.href='/phonebook.csv'">CSV Export</button>
+    <button class="btn btn-outline" onclick="copyXmlUrl()">XML URL kopieren</button>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Firma</th>
+        <th>Telefon</th>
+        <th>Mobil</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none">Keine Kontakte vorhanden.</div>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay" onclick="e => { if(e.target===this) closeModal(); }">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2 id="modal-title">Kontakt hinzufügen</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Vorname</label>
+        <input id="f-firstname" placeholder="Max">
+      </div>
+      <div class="form-group">
+        <label>Nachname</label>
+        <input id="f-lastname" placeholder="Mustermann">
+      </div>
+      <div class="form-group full">
+        <label>Firma</label>
+        <input id="f-company" placeholder="Musterfirma GmbH">
+      </div>
+      <div class="form-group">
+        <label>Telefon</label>
+        <input id="f-phone" placeholder="+43 1 234567">
+      </div>
+      <div class="form-group">
+        <label>Mobil</label>
+        <input id="f-mobile" placeholder="+43 664 1234567">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="save()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let contacts = [];
+let editId = null;
+
+async function load() {
+  const r = await fetch('/api/contacts');
+  contacts = await r.json();
+  render();
+}
+
+function render() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = contacts.filter(c =>
+    [c.firstname,c.lastname,c.company,c.phone,c.mobile]
+      .join(' ').toLowerCase().includes(q)
+  ).sort((a,b) => `${a.lastname}${a.firstname}`.localeCompare(`${b.lastname}${b.firstname}`));
+
+  const tbody = document.getElementById('tbody');
+  document.getElementById('count').textContent = `${contacts.length} Kontakte`;
+  document.getElementById('empty').style.display = filtered.length ? 'none' : 'block';
+
+  tbody.innerHTML = filtered.map(c => `
+    <tr>
+      <td><strong>${esc(c.lastname)}</strong>${c.firstname ? ', '+esc(c.firstname) : ''}</td>
+      <td>${esc(c.company)}</td>
+      <td>${c.phone ? `<a href="tel:${esc(c.phone)}" style="color:var(--accent);text-decoration:none">${esc(c.phone)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
+      <td>${c.mobile ? `<a href="tel:${esc(c.mobile)}" style="color:var(--accent);text-decoration:none">${esc(c.mobile)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
+      <td><div class="actions">
+        <button class="btn btn-outline btn-sm" onclick="openModal(${c.id})">Bearbeiten</button>
+        <button class="btn btn-danger btn-sm" onclick="del(${c.id})">Löschen</button>
+      </div></td>
+    </tr>
+  `).join('');
+}
+
+function openModal(id) {
+  editId = id || null;
+  document.getElementById('modal-title').textContent = id ? 'Kontakt bearbeiten' : 'Kontakt hinzufügen';
+  const c = id ? contacts.find(x => x.id === id) : {};
+  document.getElementById('f-firstname').value = c.firstname || '';
+  document.getElementById('f-lastname').value  = c.lastname  || '';
+  document.getElementById('f-company').value   = c.company   || '';
+  document.getElementById('f-phone').value     = c.phone     || '';
+  document.getElementById('f-mobile').value    = c.mobile    || '';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('f-firstname').focus();
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  editId = null;
+}
+
+async function save() {
+  const body = {
+    firstname: document.getElementById('f-firstname').value.trim(),
+    lastname:  document.getElementById('f-lastname').value.trim(),
+    company:   document.getElementById('f-company').value.trim(),
+    phone:     document.getElementById('f-phone').value.trim(),
+    mobile:    document.getElementById('f-mobile').value.trim(),
+  };
+  if (!body.firstname && !body.lastname) {
+    document.getElementById('f-lastname').focus();
+    return;
+  }
+  if (editId) {
+    await fetch(`/api/contacts/${editId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  } else {
+    await fetch('/api/contacts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  }
+  closeModal();
+  await load();
+  toast(editId ? 'Kontakt aktualisiert' : 'Kontakt gespeichert');
+}
+
+async function del(id) {
+  if (!confirm('Kontakt löschen?')) return;
+  await fetch(`/api/contacts/${id}`, { method:'DELETE' });
+  await load();
+  toast('Kontakt gelöscht');
+}
+
+function copyXmlUrl() {
+  const url = `${location.protocol}//${location.host}/phonebook.xml`;
+  navigator.clipboard.writeText(url);
+  toast('XML URL kopiert: ' + url);
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay')) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+load();
+</script>
+
+<footer>
+  &copy; <a href="https://thuer-it.com" target="_blank">Thür IT &amp; Medienservices</a> &mdash; v1.0.0
+</footer>
+
+</body>
+</html>
